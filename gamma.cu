@@ -53,3 +53,10 @@ void fftchirp(double * chirp1, double * chirp2, double delta, long long int N){
 		chirp1[n] += taper * cos ( TWOPI * ( kappa ));
 		chirp2[n] -= taper * sin ( TWOPI * ( kappa ));
 }
+
+__global__
+void vecpro(double * i1, double * i2, double * out){
+		int n;
+		n = blockIdx.x * TILE_WIDTH + threadIdx.x;
+		out[n] = i1[n] * i2[n];
+}
