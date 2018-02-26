@@ -20,7 +20,10 @@ int main(int argc, char * argv[]){
 		fp = fopen(argv[3],"r");
 		N = pow(2,numsamp);
 		dm = (double)strtod(argv[1],NULL);
-		
+		// FILE IO 
+		for(i = 0; i < N;i++){
+				fscanf(fp,"%lf\n",&dx);
+		}
 
 
 	    // cuda variables, types
@@ -59,11 +62,15 @@ int main(int argc, char * argv[]){
 		ddtchirp<<<,>>>(dm,ddtdm);
 		cublasCgemv(candle, CUBLAS_OP_N, N, N, alpha, N, in, 1, beta, out, 1);
 
+		// Blocking 
+		if(cudaDeviceSynchronize() != cudaSuccess){
+				fprintf(stderr,"CUDA Error: Failed to synchronize..\n");
+				return 1;
+		}
 
 
-
-		cudaEventDestory(start);
-		cudaEventDestory(stop);
+		cudaEventDestory(estart); // destroying events
+		cudaEventDestory(estop);
 		cufftDestroy(cplan); // destorying plan 
 		cublasDestroy(candle); // destorying handle
 		return 0;
