@@ -8,19 +8,19 @@
 #include "math.h"
 
 // CUDA includes
+#include "cuda.h"
 #include "cufft.h"
 #include "cublas_v2.h"
 #include "cuda_runtime.h"
-#include "helper_cuda.h"
-
-// This is how it is included 
-#include "gamma.cu" 
 
 // typedef 
 // because I am lazy to write float2 everywhere
 typedef float2 Complex; 
+
+// constants 
+
 // starting Main
-int main(int argc, char * argv){
+int main(int argc, char * argv[]){
 		if(argc < 2) {
 				printf("Direct De-dispersion Transform\n");
 				printf("Usage : <program> <DM> <exponent of two> <filename>\n");
@@ -34,20 +34,14 @@ int main(int argc, char * argv){
 				return 1;
 		}
 		// basic part
-		bw = 120E6; // 120 Mhz
-		fsky = 1300.3333; // Mhz
-		sideband = 1;
 		//
-		long long int N;
+		long N = (long)strtol(argv[2],NULL,10);
 		double dm;
 		FILE * fp;
-		fp = fopen(argv[3],"r");
-		N = pow(2,numsamp);
+		fp = fopen((const char*)argv[3],"r");
+		N = pow(2,N);
 		dm = (double)strtod(argv[1],NULL);
-		// FILE IO 
-		for(i = 0; i < N;i++){
-				fscanf(fp,"%lf\n",&dx);
-		}
+
 		// complex pointers for host and device memory
 		Complex * h_in, * d_in;
 		Complex * h_out, * ddt_out, * fft_out;
@@ -56,7 +50,17 @@ int main(int argc, char * argv){
 		// Allocating in Host
 		h_in = (Complex*)malloc(memsize);
 		h_out = (Complex*)malloc(memsize);
-
+		// FILE IO 
+		long i;
+		float dx;
+		Complex t;
+		for(i = 0; i < N;i++){
+				fscanf(fp,"%f\n",&dx);
+				t.x = dx;
+				t.y = 0.0f;
+				h_in[i] = t;
+		}
+		///////////////////////////////////////////////////////////////////
 		// Allocating in Device
 		// NOTE: For now, I am creating three N-arrays. 
 		checkCudaErrors(cudaMalloc((void**)&d_in,memsize));
@@ -77,15 +81,11 @@ int main(int argc, char * argv){
 		checkCudaErrors( cudaEventCreate(&estop) );
 		// elasped time
 		float t_fftchirp, t_fft, t_ddtchrip, t_ddt; 
-		
-		checkCudaErrors( cudaEventRecord(estart,0) );
-		checkCudaErrors( cudaEventRecord(estop,0) );
-		checkCudaErrors( cudaEventSynchronize(estop) );
-		checkCudaErrors( cudaEventElapsedTime(&t, estart, estop) );
-
+		// plans and handles	
 	    cublasStatus_t cstat;
 	    cufftHandle cplan;
 	    cublasHandle_t candle;
+	    cufftResult cufftres;
 	    cstat = cublasCreate(&candle); // creating handle
 		if(cstat != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr,"CUBLAS Initialization failed...\n");
@@ -93,28 +93,32 @@ int main(int argc, char * argv){
 		}
 		///////////////////////////////////////////////////////////////////
 		//The FFT heart
-		cufftres = cufftPlan1d(cplan, N, CUFFT_C2C, 1);
-		if(cufftres ! = CUFFT_SUCCESS) {
+		cufftres = cufftPlan1d(&cplan, N, CUFFT_C2C, 1);
+		if(cufftres != CUFFT_SUCCESS) {
 				fprintf(stderr,"CUFFT Error: Plan creation failed!.\n");
 				return 1;
 		}
 		checkCudaErrors( cudaEventRecord(estart,0) );
 		// This is the actual kernel call
-		fftchirp<<<,>>>(fft_out, delta, N);
+		dim3 grid1 = {4,4,4};
+		dim3 block1= {32,32,1};
+		fftchirp<<<grid1,block1>>>(fft_out, delta, N);
 		checkCudaErrors( cudaEventRecord(estop,0) );
 		checkCudaErrors( cudaEventSynchronize(estop) );
 		checkCudaErrors( cudaEventElapsedTime(&t_fftchirp, estart, estop) );
 		// FFT CHIRP timed
 		////////////////////////////////////////////////////////////////////
 		checkCudaErrors( cudaEventRecord(estart,0) );
-		cufftres = cufftExecC2C(&cplan, d_in, fft_out, CUFFT_FORWARD); 
-		if(cufftres ! = CUFFT_SUCCESS) {
+		cufftres = cufftExecC2C(cplan, (cufftComplex*)d_in, (cufftComplex*)fft_out, CUFFT_FORWARD); 
+		if(cufftres != CUFFT_SUCCESS) {
 				fprintf(stderr,"CUFFT Error: Transform failed!.\n");
 				return 1;
 		}
-		vecpro<<<,>>>(fft_out,d_in,fft_out);
-		cufftres = cufftExecC2C(&cplan,fft_out, fft_out, CUFFT_INVERSE); 
-		if(cufftres ! = CUFFT_SUCCESS) {
+		dim3 grid2 = {4,4,4};
+		dim3 block2= {32,32,1};
+		vecpro<<<grid2,block2>>>(fft_out,d_in,fft_out);
+		cufftres = cufftExecC2C(cplan,(cufftComplex*)fft_out, (cufftComplex*)fft_out, CUFFT_INVERSE); 
+		if(cufftres != CUFFT_SUCCESS) {
 				fprintf(stderr,"CUFFT Error: Transform failed!.\n");
 				return 1;
 		}
@@ -127,14 +131,19 @@ int main(int argc, char * argv){
 		//////////////////////////////////////////////////////////////////
 		// The DDT heart.
 		checkCudaErrors( cudaEventRecord(estart,0) );
-		ddtchirp<<<,>>>(ddtchirp,delta,N);
+		dim3 grid3 = {4,4,4};
+		dim3 block3= {32,32,1};
+		ddtchirp<<<grid3,block3>>>(ddtchirp,delta,N);
 		checkCudaErrors( cudaEventRecord(estop,0) );
 		checkCudaErrors( cudaEventSynchronize(estop) );
 		checkCudaErrors( cudaEventElapsedTime(&t_ddtchrip, estart, estop) );
 		// DDT chirp timed 
 		//////////////////////////////////////////////////////////////////
+		Complex t;
+		t.x = 1.0;
+		t.y = 0.0;
 		checkCudaErrors( cudaEventRecord(estart,0) );
-		cstat = cublasCgemv(candle, CUBLAS_OP_N, N, N, alpha, N, d_in, 1, beta, ddt_out, 1);
+		cstat = cublasCgemv(candle, CUBLAS_OP_N, N, N, &t, (cuComplex*)ddtchirp, N, (cuComplex*)d_in, 1, 0, (cuComplex*)ddt_out, 1);
 		if(cstat != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr,"CUBLAS Error: GEMV failed!.\n");
 				return 1;
@@ -152,13 +161,13 @@ int main(int argc, char * argv){
 		}
 		// Compute MSE
 		// Result goes in fft_out
-		cstat = cublasCaxpy(candle, N, alpha, ddt_out, 1, fft_out, 1);
+		cstat = cublasCaxpy(candle, N, &t, ddt_out, 1, fft_out, 1);
 		if(cstat != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr,"CUBLAS Error: AXPY failed!.\n");
 				return 1;
 		}
 		float mse;
-		cstat = cublasScnrm2(candle, N, fft_out, 1, mse);
+		cstat = cublasScnrm2(candle, N, fft_out, 1, &mse);
 		if(cstat != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr,"CUBLAS Error: NRM2 failed!.\n");
 				return 1;
