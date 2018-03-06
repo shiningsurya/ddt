@@ -1,8 +1,8 @@
 CUDA_PATH ?= /usr/local/cuda-8.0
-HOST_COMPILER ?= gcc 
+HOST_COMPILER ?= g++ 
 NVCC := $(CUDA_PATH)/bin/nvcc -ccbin $(HOST_COMPILER)
-FLAGS := -lcufft -lcublas -lm -lcuda 
-
+LFLAGS := -lcufft -lcublas -lm -lcuda 
+INCLUDES := -I.
 
 all:
 	gcc beta.c betafx.c -o beta  -lm -I/home/shining/pulsoft/include -L/home/shining/pulsoft/lib -lfftw3 -lblas
@@ -11,16 +11,13 @@ all:
 beta: beta.c betafx.c
 	gcc beta.c betafx.c -o $@  -lm -I/home/shining/pulsoft/include -L/home/shining/pulsoft/lib -lfftw3 -g -lblas
 
-gamma: gamma.cu gammafx.c
-	$(NVCC) gamma.cu gammafx.c -o $@ -lcublas -lcufft -g -L/usr/lib/"nvidia-367"
-
 gamma_kernel.o : gamma_kernel.cu
-	$(NVCC) $? -o $@ $(FLAGS)
+	$(NVCC) -c $? -o $@ $(INCLUDES) 
 gamma.o : gamma.c
-	$(NVCC) $? -o $@ $(FLAGS)
+	$(NVCC) -c $? -o $@ $(INCLUDES) 
 
 gamma : gamma.o gamma_kernel.o 
-	$(NVCC) $? -o $@
+	$(NVCC) $? -o $@ $(LFLAGS)
 
 
 makedata:

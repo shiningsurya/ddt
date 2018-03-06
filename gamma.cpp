@@ -11,6 +11,7 @@
 #include "cuda.h"
 #include "cufft.h"
 #include "cublas_v2.h"
+#include <helper_cuda.h>
 #include "cuda_runtime.h"
 
 // typedef 
@@ -18,7 +19,10 @@
 typedef float2 Complex; 
 
 // constants 
-
+__global__ void ddtchirp(Complex * chirp, float delta, long N) {
+__global__ void fftchirp(Complex * chirp, float delta, long N){
+__device__ Complex ComplexMult(Complex one, Complex two) {
+__global__ void vecpro(Complex * i1, Complex * i2, Complex * out){
 // starting Main
 int main(int argc, char * argv[]){
 		if(argc < 2) {
@@ -139,7 +143,6 @@ int main(int argc, char * argv[]){
 		checkCudaErrors( cudaEventElapsedTime(&t_ddtchrip, estart, estop) );
 		// DDT chirp timed 
 		//////////////////////////////////////////////////////////////////
-		Complex t;
 		t.x = 1.0;
 		t.y = 0.0;
 		checkCudaErrors( cudaEventRecord(estart,0) );
