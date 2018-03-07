@@ -54,7 +54,6 @@ dkms.conf
 *.swo
 beta
 pmm
-*.py
 *.pyc
 *.cpp
 doesthiswork

@@ -196,7 +196,7 @@ int main(int argc, char * argv[]){
 				return 1;
 		}
 		/////////////////////////////////////////////////////////////////
-		printf("%ld, %f, %f. %f, %f, %f\n",N, t_fftchirp, t_ddtchrip, t_fft, t_ddt, mse);
+		printf("%ld, %f, %f, %f, %f, %f\n",N, t_fftchirp, t_ddtchrip, t_fft, t_ddt, mse);
 		// Exit
 		cudaEventDestroy(estart); // destroying events
 		cudaEventDestroy(estop);
