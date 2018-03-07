@@ -1,7 +1,7 @@
 CUDA_PATH ?= /usr/local/cuda-8.0
 HOST_COMPILER ?= g++ 
-NVCC := $(CUDA_PATH)/bin/nvcc -ccbin $(HOST_COMPILER)
-LFLAGS := -lcufft -lcublas -lm -lcuda -g 
+NVCC := $(CUDA_PATH)/bin/nvcc -ccbin $(HOST_COMPILER) -g -G
+LFLAGS := -lcufft -lcublas -lm -lcuda
 INCLUDES := -I. -I$(CUDA_PATH)/targets/x86_64-linux/include
 
 all:

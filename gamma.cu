@@ -52,7 +52,7 @@ int main(int argc, char * argv[]){
 		cudaDeviceProp deviceProp;
 		checkCudaErrors(cudaSetDevice(devID));
 		checkCudaErrors(cudaGetDeviceProperties(&deviceProp, devID));
-		printf("GPU Device %d: \"%s\" with compute capability %d.%d\n\n", devID, deviceProp.name, deviceProp.major, deviceProp.minor);
+		/*printf("GPU Device %d: \"%s\" with compute capability %d.%d\n\n", devID, deviceProp.name, deviceProp.major, deviceProp.minor);*/
 		// basic part
 		//
 		long N = (long)strtol(argv[2],NULL,10);
@@ -160,10 +160,13 @@ int main(int argc, char * argv[]){
 		checkCudaErrors( cudaEventElapsedTime(&t_ddtchrip, estart, estop) );
 		// DDT chirp timed 
 		//////////////////////////////////////////////////////////////////
-		t.x = 1.0;
-		t.y = 0.0;
+		t.x = 1.0f;
+		t.y = 0.0f;
 		checkCudaErrors( cudaEventRecord(estart,0) );
-		cstat = cublasCgemv(candle, CUBLAS_OP_N, N, N, &t, (cuComplex*)ddtchirp, N, (cuComplex*)d_in, 1, 0, (cuComplex*)ddt_out, 1);
+		Complex u;
+		u.x = 0.0f;
+		u.y = 0.0f;
+		cstat = cublasCgemv(candle, CUBLAS_OP_N, N, N, &t, (cuComplex*)ddtchirp_mat, N, (cuComplex*)d_in, 1, &u, (cuComplex*)ddt_out, 1);
 		if(cstat != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr,"CUBLAS Error: GEMV failed!.\n");
 				return 1;
