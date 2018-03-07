@@ -1,4 +1,4 @@
-// This is Gammafx.
+// This is Gamma.
 // This is the original code
 
 // Constants
@@ -31,11 +31,12 @@ __global__ void ddtchirp(Complex * chirp, float delta, long N);
 __global__ void fftchirp(Complex * chirp, float delta, long N);
 __device__ Complex ComplexMult(Complex one, Complex two);
 __global__ void vecpro(Complex * i1, Complex * i2, Complex * out);
-void  checkCudaErrors(cudaError_t cer) {
-		if(cer != cudaSuccess) {
-				printf("[!!] CUDA Failure at %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(cer));
-				exit(1);
-		}
+#define checkCudaErrors(cce) {\
+		cudaError_t cer = cce;\
+		if(cer != cudaSuccess) {\
+				printf("[!!] CUDA Failure at %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(cer));\
+				exit(1);\
+		}\
 }
 
 // starting Main
@@ -50,8 +51,8 @@ int main(int argc, char * argv[]){
 		int devID = 0; // Device ID
 		cudaDeviceProp deviceProp;
 		checkCudaErrors(cudaSetDevice(devID));
-        checkCudaErrors(cudaGetDeviceProperties(&deviceProp, devID));
-        printf("GPU Device %d: \"%s\" with compute capability %d.%d\n\n", devID, deviceProp.name, deviceProp.major, deviceProp.minor);
+		checkCudaErrors(cudaGetDeviceProperties(&deviceProp, devID));
+		printf("GPU Device %d: \"%s\" with compute capability %d.%d\n\n", devID, deviceProp.name, deviceProp.major, deviceProp.minor);
 		// basic part
 		//
 		long N = (long)strtol(argv[2],NULL,10);
@@ -90,23 +91,23 @@ int main(int argc, char * argv[]){
 		// Need N^2 elements
 		checkCudaErrors(cudaMalloc((void**)&fft_out,memsize));
 		// These are compressed commands
-	
-		// Copying from Host to Device 
-		checkCudaErrors(cudaMemcpy(h_in, d_in, memsize, cudaMemcpyHostToDevice));
 
-	    // cuda variables, types
-	    // measure time
-	    cudaEvent_t estart, estop; 
+		// Copying from Host to Device 
+		checkCudaErrors(cudaMemcpy(d_in, h_in, memsize, cudaMemcpyHostToDevice));
+
+		// cuda variables, types
+		// measure time
+		cudaEvent_t estart, estop; 
 		checkCudaErrors( cudaEventCreate(&estart) );
 		checkCudaErrors( cudaEventCreate(&estop) );
 		// elasped time
 		float t_fftchirp, t_fft, t_ddtchrip, t_ddt; 
 		// plans and handles	
-	    cublasStatus_t cstat;
-	    cufftHandle cplan;
-	    cublasHandle_t candle;
-	    cufftResult cufftres;
-	    cstat = cublasCreate(&candle); // creating handle
+		cublasStatus_t cstat;
+		cufftHandle cplan;
+		cublasHandle_t candle;
+		cufftResult cufftres;
+		cstat = cublasCreate(&candle); // creating handle
 		if(cstat != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr,"CUBLAS Initialization failed...\n");
 				return 1;
@@ -147,7 +148,7 @@ int main(int argc, char * argv[]){
 		checkCudaErrors( cudaEventElapsedTime(&t_fft, estart, estop) );
 		// FFT timed 
 		//////////////////////////////////////////////////////////////////
-		
+
 		//////////////////////////////////////////////////////////////////
 		// The DDT heart.
 		checkCudaErrors( cudaEventRecord(estart,0) );
@@ -172,7 +173,7 @@ int main(int argc, char * argv[]){
 		checkCudaErrors( cudaEventElapsedTime(&t_ddt, estart, estop) );
 		// DDT timed 
 		//////////////////////////////////////////////////////////////////
-		
+
 		// Blocking 
 		if(cudaDeviceSynchronize() != cudaSuccess){
 				fprintf(stderr,"CUDA Error: Failed to synchronize..\n");
