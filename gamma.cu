@@ -31,6 +31,7 @@ __global__ void ddtchirp(Complex * chirp, float delta, long N);
 __global__ void fftchirp(Complex * chirp, float delta, long N);
 __device__ Complex ComplexMult(Complex one, Complex two);
 __global__ void vecpro(Complex * i1, Complex * i2, Complex * out);
+__global__ void gemv(Complex * A, Complex * x, Complex * y, long N);
 #define checkCudaErrors(cce) {\
 		cudaError_t cer = cce;\
 		if(cer != cudaSuccess) {\
@@ -124,6 +125,11 @@ int main(int argc, char * argv[]){
 		dim3 grid1(4,4,4);
 		dim3 block1(32,32,1);
 		fftchirp<<<grid1,block1>>>(fft_out, dm, N);
+		// Blocking 
+		if(cudaDeviceSynchronize() != cudaSuccess){
+				fprintf(stderr,"CUDA Error: Failed to synchronize..\n");
+				return 1;
+		}
 		checkCudaErrors( cudaEventRecord(estop,0) );
 		checkCudaErrors( cudaEventSynchronize(estop) );
 		checkCudaErrors( cudaEventElapsedTime(&t_fftchirp, estart, estop) );
@@ -131,6 +137,11 @@ int main(int argc, char * argv[]){
 		////////////////////////////////////////////////////////////////////
 		checkCudaErrors( cudaEventRecord(estart,0) );
 		cufftres = cufftExecC2C(cplan, (cufftComplex*)d_in, (cufftComplex*)fft_out, CUFFT_FORWARD); 
+		// Blocking 
+		if(cudaDeviceSynchronize() != cudaSuccess){
+				fprintf(stderr,"CUDA Error: Failed to synchronize..\n");
+				return 1;
+		}
 		if(cufftres != CUFFT_SUCCESS) {
 				fprintf(stderr,"CUFFT Error: Transform failed!.\n");
 				return 1;
@@ -138,7 +149,17 @@ int main(int argc, char * argv[]){
 		dim3 grid2(4,4,4);
 		dim3 block2(32,32,1);
 		vecpro<<<grid2,block2>>>(fft_out,d_in,fft_out);
+		// Blocking 
+		if(cudaDeviceSynchronize() != cudaSuccess){
+				fprintf(stderr,"CUDA Error: Failed to synchronize..\n");
+				return 1;
+		}
 		cufftres = cufftExecC2C(cplan,(cufftComplex*)fft_out, (cufftComplex*)fft_out, CUFFT_INVERSE); 
+		// Blocking 
+		if(cudaDeviceSynchronize() != cudaSuccess){
+				fprintf(stderr,"CUDA Error: Failed to synchronize..\n");
+				return 1;
+		}
 		if(cufftres != CUFFT_SUCCESS) {
 				fprintf(stderr,"CUFFT Error: Transform failed!.\n");
 				return 1;
@@ -155,6 +176,11 @@ int main(int argc, char * argv[]){
 		dim3 grid3(4,4,4);
 		dim3 block3(32,32,1);
 		ddtchirp<<<grid3,block3>>>(ddtchirp_mat,dm,N);
+		// Blocking 
+		if(cudaDeviceSynchronize() != cudaSuccess){
+				fprintf(stderr,"CUDA Error: Failed to synchronize..\n");
+				return 1;
+		}
 		checkCudaErrors( cudaEventRecord(estop,0) );
 		checkCudaErrors( cudaEventSynchronize(estop) );
 		checkCudaErrors( cudaEventElapsedTime(&t_ddtchrip, estart, estop) );
@@ -167,6 +193,19 @@ int main(int argc, char * argv[]){
 		u.x = 0.0f;
 		u.y = 0.0f;
 		cstat = cublasCgemv(candle, CUBLAS_OP_N, N, N, &t, (cuComplex*)ddtchirp_mat, N, (cuComplex*)d_in, 1, &u, (cuComplex*)ddt_out, 1);
+		//////////////////////////////////////////////
+		// Using custom kernel 
+		/*
+		 *dim3 grid4(N/1024);
+		 *dim3 block4(1024);
+		 *gemv<<<grid4,block4>>>(ddtchirp_mat, d_in, ddt_out, N);
+		 */
+		/////////////////////////////////////////////
+		// Blocking 
+		if(cudaDeviceSynchronize() != cudaSuccess){
+				fprintf(stderr,"CUDA Error: Failed to synchronize..\n");
+				return 1;
+		}
 		if(cstat != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr,"CUBLAS Error: GEMV failed!.\n");
 				return 1;
@@ -272,8 +311,24 @@ __device__ Complex ComplexMult(Complex one, Complex two) {
 		return ret;
 }
 
+__device__ Complex ComplexAdd(Complex one, Complex two){
+		Complex ret;
+		ret.x = one.x + two.x;
+		ret.y = one.y + two.y;
+		return ret;
+}
+
 __global__ void vecpro(Complex * i1, Complex * i2, Complex * out){
 		int n;
 		n = blockIdx.x * blockDim.x + threadIdx.x;
 		out[n] = ComplexMult(i1[n],i2[n]); 
+}
+
+__global__ void gemv(Complex * A, Complex * x, Complex * y, long N){
+		int i,j;
+		j = blockIdx.x * blockDim.x + threadIdx.x;
+		i = j/N; // row 
+		j = j - (i*N); // column
+		// Multiplication
+		y[i] = ComplexAdd( y[i], ComplexMult(A[i*N + j],x[j]) );
 }
